@@ -1,0 +1,17 @@
+{
+  "name": "whatsapp-bot-server",
+  "version": "1.0.0",
+  "description": "WhatsApp Bot with Claude AI integration",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": ["whatsapp", "bot", "claude", "ai"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1"
+  }
+}
