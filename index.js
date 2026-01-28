@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const { Pool } = require('pg');
+const path = require('path');
 
 const app = express();
 app.use(express.json());
@@ -249,6 +250,86 @@ async function sendWhatsAppMessage(to, message) {
     console.error('WhatsApp API Error:', error.response?.data || error.message);
   }
 }
+
+
+// Serve static files from public directory
+app.use(express.static(path.join(__dirname, 'public')));
+
+// API Endpoints for Admin Panel
+
+// Get dashboard stats
+app.get('/api/stats', async (req, res) => {
+  try {
+    const totalUsersResult = await pool.query('SELECT COUNT(*) FROM users');
+    const messagesTodayResult = await pool.query(
+      `SELECT COUNT(*) FROM conversations 
+       WHERE DATE(timestamp) = CURRENT_DATE`
+    );
+    const activeConversationsResult = await pool.query(
+      `SELECT COUNT(DISTINCT user_id) FROM conversations 
+       WHERE timestamp > NOW() - INTERVAL '24 hours'`
+    );
+    
+    res.json({
+      totalUsers: parseInt(totalUsersResult.rows[0].count),
+      messagesToday: parseInt(messagesTodayResult.rows[0].count),
+      activeConversations: parseInt(activeConversationsResult.rows[0].count)
+    });
+  } catch (error) {
+    console.error('Error getting stats:', error);
+    res.status(500).json({ error: 'Error getting stats' });
+  }
+});
+
+// Get all conversations
+app.get('/api/conversations', async (req, res) => {
+  try {
+    const limit = req.query.limit || 100;
+    const result = await pool.query(`
+      SELECT c.*, u.phone_number 
+      FROM conversations c
+      JOIN users u ON c.user_id = u.id
+      ORDER BY c.timestamp DESC
+      LIMIT $1
+    `, [limit]);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error getting conversations:', error);
+    res.status(500).json({ error: 'Error getting conversations' });
+  }
+});
+
+// Get all users
+app.get('/api/users', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT u.*, 
+             COUNT(c.id) as message_count
+      FROM users u
+      LEFT JOIN conversations c ON u.id = c.user_id
+      GROUP BY u.id
+      ORDER BY u.created_at DESC
+    `);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error getting users:', error);
+    res.status(500).json({ error: 'Error getting users' });
+  }
+});
+
+// Get conversation history for a specific user
+app.get('/api/conversations/:phoneNumber', async (req, res) => {
+  try {
+    const { phoneNumber } = req.params;
+    const conversations = await getConversationHistory(phoneNumber, 50);
+    res.json(conversations);
+  } catch (error) {
+    console.error('Error getting user conversations:', error);
+    res.status(500).json({ error: 'Error getting user conversations' });
+  }
+});
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
