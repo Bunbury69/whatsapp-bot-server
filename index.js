@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
+const { Pool } = require('pg');
 
 const app = express();
 app.use(express.json());
@@ -10,6 +11,96 @@ const VERIFY_TOKEN = process.env.VERIFY_TOKEN || 'your_verify_token';
 const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+
+// PostgreSQL connection
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
+});
+
+// Initialize database
+async function initializeDatabase() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        phone_number VARCHAR(50) UNIQUE NOT NULL,
+        name VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      
+      CREATE TABLE IF NOT EXISTS conversations (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        message TEXT NOT NULL,
+        sender VARCHAR(20) NOT NULL,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      
+      CREATE TABLE IF NOT EXISTS bot_status (
+        id SERIAL PRIMARY KEY,
+        phone_number VARCHAR(50) UNIQUE NOT NULL,
+        is_active BOOLEAN DEFAULT TRUE,
+        last_message_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('Database initialized successfully');
+  } catch (error) {
+    console.error('Error initializing database:', error);
+  }
+}
+
+// Save message to database
+async function saveMessage(phoneNumber, message, sender) {
+  try {
+    // Get or create user
+    let userResult = await pool.query(
+      'SELECT id FROM users WHERE phone_number = $1',
+      [phoneNumber]
+    );
+    
+    if (userResult.rows.length === 0) {
+      userResult = await pool.query(
+        'INSERT INTO users (phone_number) VALUES ($1) RETURNING id',
+        [phoneNumber]
+      );
+    }
+    
+    const userId = userResult.rows[0].id;
+    
+    // Save conversation
+    await pool.query(
+      'INSERT INTO conversations (user_id, message, sender) VALUES ($1, $2, $3)',
+      [userId, message, sender]
+    );
+  } catch (error) {
+    console.error('Error saving message:', error);
+  }
+}
+
+// Get conversation history
+async function getConversationHistory(phoneNumber, limit = 10) {
+  try {
+    const result = await pool.query(`
+      SELECT c.message, c.sender, c.timestamp
+      FROM conversations c
+      JOIN users u ON c.user_id = u.id
+      WHERE u.phone_number = $1
+      ORDER BY c.timestamp DESC
+      LIMIT $2
+    `, [phoneNumber, limit]);
+    
+    return result.rows.reverse();
+  } catch (error) {
+    console.error('Error getting conversation history:', error);
+    return [];
+  }
+}
+
+// Initialize database on startup
+initializeDatabase();
 
 // Webhook verification
 app.get('/webhook', (req, res) => {
@@ -41,12 +132,18 @@ app.post('/webhook', async (req, res) => {
           const text = message.text.body;
           
           console.log(`Message from ${from}: ${text}`);
+
+                        // Save incoming message to database
+              await saveMessage(from, text, 'user');
           
           // Get AI response (con soporte para Claude opcional)
           const aiResponse = await getResponse(text);
           
           // Send response back
           await sendWhatsAppMessage(from, aiResponse);
+                        
+              // Save bot response to database
+              await saveMessage(from, aiResponse, 'bot');
         }
       });
       
