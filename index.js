@@ -278,9 +278,23 @@ app.post('/api/auth/send-2fa', async (req, res) => {
         return res.status(400).json({ error: 'Número de teléfono requerido para WhatsApp 2FA' });
       }
       
-      // Normalize phone numbers for comparison
-      const normalizedInput = phoneNumber.replace(/[^0-9]/g, '');
+      // Normalize phone numbers: add +52 if only 10 digits
+      let normalizedInput = phoneNumber.trim().replace(/[\s\-()]/g, '');
+      if (normalizedInput.length === 10 && /^\d{10}$/.test(normalizedInput)) {
+        normalizedInput = '52' + normalizedInput;
+      } else {
+        normalizedInput = normalizedInput.replace(/[^0-9]/g, '');
+      }
+      
       const normalizedAdmin = ADMIN_PHONE.replace(/[^0-9]/g, '');
+      
+      console.log('Phone validation:', {
+        input: phoneNumber,
+        normalizedInput,
+        normalizedAdmin,
+        match: normalizedInput === normalizedAdmin
+      });
+      // Normalize phone numbers for comparison
       
       if (normalizedInput !== normalizedAdmin) {
         return res.status(403).json({ 
@@ -302,6 +316,22 @@ app.post('/api/auth/send-2fa', async (req, res) => {
     // Send code via WhatsApp
     if (method === 'whatsapp') {
       const message = `🔐 *Código de verificación*\n\nTu código de acceso al Panel de Administración es:\n\n*${code}*\n\nVálido por 5 minutos.`;
+            console.log('Sending WhatsApp 2FA code:', { to: ADMIN_PHONE, code });
+      await sendWhatsAppMessage(ADMIN_PHONE, message);
+      console.log('WhatsApp message sent successfully');
+    } else {
+      console.log('Email 2FA not implemented yet');
+    }
+    
+    console.log(`2FA code generated: ${code}, sent to ${method}`);
+    res.json({ success: true, message: `Código enviado a tu ${method === 'whatsapp' ? 'WhatsApp' : method}` });
+  } catch (error) {
+    console.error('Error sending 2FA:', error);
+    res.status(500).json({ error: 'Error al enviar código: ' + error.message });
+  }
+});
+
+app.post('/api/auth/verify-2fa', async (req, res) => {
       await sendWhatsAppMessage(ADMIN_PHONE, message);
     }
     
