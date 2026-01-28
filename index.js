@@ -9,6 +9,7 @@ const PORT = process.env.PORT || 3000;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN || 'your_verify_token';
 const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 
 // Webhook verification
 app.get('/webhook', (req, res) => {
@@ -133,7 +134,7 @@ function getSimpleResponse(message) {
 async function sendWhatsAppMessage(to, message) {
   try {
     await axios.post(
-      `https://graph.facebook.com/v18.0/${process.env.PHONE_NUMBER_ID}/messages`,
+      `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`,
       {
         messaging_product: 'whatsapp',
         to: to,
