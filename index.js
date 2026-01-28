@@ -255,6 +255,93 @@ async function sendWhatsAppMessage(to, message) {
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, 'public')));
 
+
+// Admin credentials and 2FA storage
+const ADMIN_EMAIL = 'nacho_bunbury@hotmail.com';
+const ADMIN_PASSWORD = 'admin123';
+const ADMIN_PHONE = '+529612991499';
+const twoFactorCodes = new Map(); // Store temporary 2FA codes
+
+// Authentication endpoints
+app.post('/api/auth/send-2fa', async (req, res) => {
+  try {
+    const { email, password, phoneNumber, method } = req.body;
+    
+    // Validate credentials
+    if (email !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) {
+      return res.status(401).json({ error: 'Correo o contraseña incorrectos' });
+    }
+    
+    // Validate phone number if WhatsApp method
+    if (method === 'whatsapp') {
+      if (!phoneNumber) {
+        return res.status(400).json({ error: 'Número de teléfono requerido para WhatsApp 2FA' });
+      }
+      
+      // Normalize phone numbers for comparison
+      const normalizedInput = phoneNumber.replace(/[^0-9]/g, '');
+      const normalizedAdmin = ADMIN_PHONE.replace(/[^0-9]/g, '');
+      
+      if (normalizedInput !== normalizedAdmin) {
+        return res.status(403).json({ 
+          error: `Número de teléfono incorrecto. Este número no está asociado al administrador.`
+        });
+      }
+    }
+    
+    // Generate 6-digit code
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Store code with 5 minute expiration
+    twoFactorCodes.set(email, {
+      code: code,
+      expiresAt: Date.now() + 5 * 60 * 1000,
+      method: method
+    });
+    
+    // Send code via WhatsApp
+    if (method === 'whatsapp') {
+      const message = `🔐 *Código de verificación*\n\nTu código de acceso al Panel de Administración es:\n\n*${code}*\n\nVálido por 5 minutos.`;
+      await sendWhatsAppMessage(ADMIN_PHONE, message);
+    }
+    
+    console.log(`2FA code sent to ${method}: ${code}`);
+    res.json({ success: true, message: `Código enviado a tu ${method}` });
+  } catch (error) {
+    console.error('Error sending 2FA:', error);
+    res.status(500).json({ error: 'Error al enviar código' });
+  }
+});
+
+app.post('/api/auth/verify-2fa', async (req, res) => {
+  try {
+    const { email, code } = req.body;
+    
+    const stored = twoFactorCodes.get(email);
+    
+    if (!stored) {
+      return res.status(401).json({ error: 'Código no encontrado o expirado' });
+    }
+    
+    if (Date.now() > stored.expiresAt) {
+      twoFactorCodes.delete(email);
+      return res.status(401).json({ error: 'Código expirado' });
+    }
+    
+    if (stored.code !== code) {
+      return res.status(401).json({ error: 'Código incorrecto' });
+    }
+    
+    // Code is valid, delete it
+    twoFactorCodes.delete(email);
+    
+    res.json({ success: true, message: 'Autenticación exitosa' });
+  } catch (error) {
+    console.error('Error verifying 2FA:', error);
+    res.status(500).json({ error: 'Error al verificar código' });
+  }
+});
+
 // API Endpoints for Admin Panel
 
 // Get dashboard stats
