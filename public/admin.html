@@ -469,18 +469,58 @@
             const twoFactorMethod = document.getElementById('twoFactorMethod').value;
             
             // For demo purposes - in production, implement real authentication
-            if (email && password) {
-                // Simulate 2FA
-                alert(`Código de verificación enviado a tu ${twoFactorMethod === 'email' ? 'correo' : 'WhatsApp'}`);
-                const code = prompt('Ingresa el código de verificación:');
+            const phoneNumber = document.getElementById('phoneNumber').value;
+            
+            try {
+                // Send 2FA code
+                const response = await fetch(`${API_BASE_URL}/api/auth/send-2fa`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email,
+                        password,
+                        phoneNumber,
+                        method: twoFactorMethod
+                    })
+                });
                 
-                if (code) {
-                    sessionStorage.setItem('adminLoggedIn', 'true');
-                    sessionStorage.setItem('adminEmail', email);
-                    showDashboard();
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    showError(data.error || 'Error al enviar código');
+                    return;
                 }
-            } else {
-                showError('Por favor completa todos los campos');
+                
+                // Ask for verification code
+                const code = prompt(`${data.message}\n\nIngresa el código de 6 dígitos:`);
+                
+                if (!code) {
+                    showError('Verificación cancelada');
+                    return;
+                }
+                
+                // Verify 2FA code
+                const verifyResponse = await fetch(`${API_BASE_URL}/api/auth/verify-2fa`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, code })
+                });
+                
+                const verifyData = await verifyResponse.json();
+                
+                if (!verifyResponse.ok) {
+                    showError(verifyData.error || 'Código inválido');
+                    return;
+                }
+                
+                // Success!
+                sessionStorage.setItem('adminLoggedIn', 'true');
+                sessionStorage.setItem('adminEmail', email);
+                showDashboard();
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Error de conexión. Intenta nuevamente.');
             }
         });
         
