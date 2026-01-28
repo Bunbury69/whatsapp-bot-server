@@ -317,6 +317,11 @@
                     <option value="whatsapp">WhatsApp</option>
                 </select>
             </div>
+
+                        <div class="form-group" id="phoneNumberGroup" style="display:none">
+                <label for="phoneNumber">Número de Celular (WhatsApp)</label>
+                <input type="tel" id="phoneNumber" placeholder="+52 961 123 4567">
+            </div>
             
             <button type="submit" class="btn">Iniciar Sesión</button>
         </form>
@@ -437,6 +442,24 @@
     <script>
         // Authentication
         const API_BASE_URL = window.location.origin;
+
+                // Show/hide phone number field based on 2FA method
+        document.getElementById('twoFactorMethod').addEventListener('change', function() {
+            const phoneGroup = document.getElementById('phoneNumberGroup');
+            if (this.value === 'whatsapp') {
+                phoneGroup.style.display = 'block';
+                document.getElementById('phoneNumber').required = true;
+            } else {
+                phoneGroup.style.display = 'none';
+                document.getElementById('phoneNumber').required = false;
+            }
+        });
+        
+        // Administrador predeterminado
+        const ADMIN_EMAIL = 'nacho_bunbury@hotmail.com';
+        const ADMIN_PASSWORD = 'admin123'; // Cambiar por tu contraseña
+        const ADMIN_PHONE = '+529612336669';
+
         
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
