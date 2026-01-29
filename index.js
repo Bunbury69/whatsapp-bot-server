@@ -302,7 +302,8 @@ app.post('/api/auth/send-2fa', async (req, res) => {
     // Validate phone number if WhatsApp method
     if (method === 'whatsapp') {
       if (!phoneNumber) {
-        return res.status(400).json({ error: 'Número de teléfono requerido para WhatsApp 2FA' });
+              return res.status(401).json({ error: 'Correo o contraseña incorrectos' });
+    }
       }
       
       // Normalize phone numbers: add +52 if only 10 digits
@@ -323,12 +324,11 @@ app.post('/api/auth/send-2fa', async (req, res) => {
       // Normalize phone numbers for comparison
       
       if (normalizedInput !== normalizedAdmin) {
-Add administrators table and role-based authentication          error: `Número de teléfono incorrecto. Este número no está asociado al administrador.`
+                return res.status(403).json({  error: `Número de teléfono incorrecto. Este número no está asociado al administrador.` });
         });
       }
     }
-    
-    // Generate 6-digit code
+
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     
     // Store code with 5 minute expiration
