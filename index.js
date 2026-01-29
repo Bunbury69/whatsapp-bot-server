@@ -46,6 +46,22 @@ async function initializeDatabase() {
         is_active BOOLEAN DEFAULT TRUE,
         last_message_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+            CREATE TABLE IF NOT EXISTS administrators (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        phone_number VARCHAR(50) UNIQUE NOT NULL,
+        name VARCHAR(255),
+        role VARCHAR(50) DEFAULT 'viewer',
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_login TIMESTAMP
+      );
+
+            -- Insert default admin if not exists
+      INSERT INTO administrators (email, phone_number, name, role)
+      VALUES ('nacho_bunbury@hotmail.com', '+529612991499', 'Admin Principal', 'admin')
+      ON CONFLICT (email) DO NOTHING;
     `);
     console.log('Database initialized successfully');
   } catch (error) {
@@ -268,9 +284,20 @@ app.post('/api/auth/send-2fa', async (req, res) => {
     const { email, password, phoneNumber, method } = req.body;
     
     // Validate credentials
-    if (email !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) {
-      return res.status(401).json({ error: 'Correo o contraseña incorrectos' });
+    // Validate credentials against database
+    const adminResult = await pool.query(
+      'SELECT * FROM administrators WHERE email = $1 AND is_active = TRUE',
+      [email]
+    );
+    
+    if (adminResult.rows.length === 0) {
+      return res.status(401).json({ error: 'Correo no autorizado o cuenta inactiva' });
     }
+    
+    const admin = adminResult.rows[0];
+    
+    // For now, we'll use simple password check (in production, use bcrypt)
+    if (password !== ADMIN_PASSWORD) {    }
     
     // Validate phone number if WhatsApp method
     if (method === 'whatsapp') {
@@ -286,8 +313,7 @@ app.post('/api/auth/send-2fa', async (req, res) => {
         normalizedInput = normalizedInput.replace(/[^0-9]/g, '');
       }
       
-      const normalizedAdmin = ADMIN_PHONE.replace(/[^0-9]/g, '');
-      
+      const normalizedAdmin = admin.phone_number.replace(/[^0-9]/g, '');      
       console.log('Phone validation:', {
         input: phoneNumber,
         normalizedInput,
@@ -297,8 +323,7 @@ app.post('/api/auth/send-2fa', async (req, res) => {
       // Normalize phone numbers for comparison
       
       if (normalizedInput !== normalizedAdmin) {
-        return res.status(403).json({ 
-          error: `Número de teléfono incorrecto. Este número no está asociado al administrador.`
+Add administrators table and role-based authentication          error: `Número de teléfono incorrecto. Este número no está asociado al administrador.`
         });
       }
     }
@@ -321,13 +346,10 @@ Tu código de acceso al Panel de Administración es:
 
 *${code}*
 
-Válido por 5 minutos.`;            console.log('Sending WhatsApp 2FA code:', { to: ADMIN_PHONE, code });
-      await sendWhatsAppMessage(ADMIN_PHONE, message);
+      console.log('Sending WhatsApp 2FA code:', { to: admin.phone_number, code });      await sendWhatsAppMessage(ADMIN_PHONE, message);
       console.log('WhatsApp message sent successfully');
     } else {
       console.log('Email 2FA not implemented yet');
-    }
-    
     console.log(`2FA code generated: ${code}, sent to ${method}`);
     res.json({ success: true, message: `Código enviado a tu ${method === 'whatsapp' ? 'WhatsApp' : method}` });
   } catch (error) {
