@@ -462,6 +462,85 @@ app.get('/api/conversations/:phoneNumber', async (req, res) => {
   }
 });
 
+
+// Admin Management Endpoints
+// Get all administrators
+app.get('/api/administrators', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT id, email, phone_number, name, role, is_active, created_at, last_login 
+      FROM administrators
+      ORDER BY created_at DESC
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error getting administrators:', error);
+    res.status(500).json({ error: 'Error getting administrators' });
+  }
+});
+
+// Add new administrator
+app.post('/api/administrators', async (req, res) => {
+  try {
+    const { email, phone_number, name, role } = req.body;
+    
+    const result = await pool.query(
+      'INSERT INTO administrators (email, phone_number, name, role) VALUES ($1, $2, $3, $4) RETURNING *',
+      [email, phone_number, name, role || 'viewer']
+    );
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error adding administrator:', error);
+    res.status(500).json({ error: 'Error adding administrator: ' + error.message });
+  }
+});
+
+// Update administrator
+app.put('/api/administrators/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { email, phone_number, name, role, is_active } = req.body;
+    
+    const result = await pool.query(
+      'UPDATE administrators SET email = $1, phone_number = $2, name = $3, role = $4, is_active = $5 WHERE id = $6 RETURNING *',
+      [email, phone_number, name, role, is_active, id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Administrator not found' });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating administrator:', error);
+    res.status(500).json({ error: 'Error updating administrator: ' + error.message });
+  }
+});
+
+// Delete administrator
+app.delete('/api/administrators/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Prevent deleting the last admin
+    const countResult = await pool.query('SELECT COUNT(*) FROM administrators WHERE is_active = TRUE AND role = \'admin\'');
+    if (parseInt(countResult.rows[0].count) <= 1) {
+      return res.status(400).json({ error: 'Cannot delete the last active administrator' });
+    }
+    
+    const result = await pool.query('DELETE FROM administrators WHERE id = $1 RETURNING *', [id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Administrator not found' });
+    }
+    
+    res.json({ message: 'Administrator deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting administrator:', error);
+    res.status(500).json({ error: 'Error deleting administrator: ' + error.message });
+  }
+});
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
 });
