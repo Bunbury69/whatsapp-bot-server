@@ -325,7 +325,6 @@ app.post('/api/auth/send-2fa', async (req, res) => {
       
       if (normalizedInput !== normalizedAdmin) {
                 return res.status(403).json({  error: `Número de teléfono incorrecto. Este número no está asociado al administrador.` });
-        });
       }
     }
 
