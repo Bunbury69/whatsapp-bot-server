@@ -341,18 +341,21 @@ app.post('/api/auth/send-2fa', async (req, res) => {
     
     // Send code via WhatsApp
     if (method === 'whatsapp') {
-      const message = `🔐 *Código de verificación*
+    const message = `🔐 *Código de verificación*
 
 Tu código de acceso al Panel de Administración es:
 
-*${code}*
+*${code}*`;
 
-      console.log('Sending WhatsApp 2FA code:', { to: admin.phone_number, code });      await sendWhatsAppMessage(ADMIN_PHONE, message);
-      console.log('WhatsApp message sent successfully');
-    } else {
-      console.log('Email 2FA not implemented yet');
-    console.log(`2FA code generated: ${code}, sent to ${method}`);
-    res.json({ success: true, message: `Código enviado a tu ${method === 'whatsapp' ? 'WhatsApp' : method}` });
+    console.log('Sending WhatsApp 2FA code:', { to: admin.phone_number, code });
+    await sendWhatsAppMessage(ADMIN_PHONE, message);
+    console.log('WhatsApp message sent successfully');
+  } else {
+    console.log('Email 2FA not implemented yet');
+  }
+  
+  console.log(`2FA code generated: ${code}, sent to ${method}`);
+  res.json({ success: true, message: `Código enviado a tu ${method === 'whatsapp' ? 'WhatsApp' : method}` });
   } catch (error) {
     console.error('Error sending 2FA:', error);
     res.status(500).json({ error: 'Error al enviar código: ' + error.message });
