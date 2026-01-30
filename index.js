@@ -298,6 +298,8 @@ app.post('/api/auth/send-2fa', async (req, res) => {
     
     // For now, we'll use simple password check (in production, use bcrypt)
     if (password !== ADMIN_PASSWORD) {    }
+          return res.status(401).json({ error: 'Correo o contraseña incorrectos' });
+        }
     
     // Validate phone number if WhatsApp method
     if (method === 'whatsapp') {
