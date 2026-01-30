@@ -524,8 +524,8 @@ app.delete('/api/administrators/:id', async (req, res) => {
     const { id } = req.params;
     
     // Prevent deleting the last admin
-    const countResult = await pool.query('SELECT COUNT(*) FROM administrators WHERE is_active = TRUE AND role = \'admin\'');
-    if (parseInt(countResult.rows[0].count) <= 1) {
+    const countResult = await pool.query("SELECT COUNT(*) FROM administrators WHERE is_active = TRUE AND role = 'admin'");
+        if (parseInt(countResult.rows[0].count) <= 1) {
       return res.status(400).json({ error: 'Cannot delete the last active administrator' });
     }
     
